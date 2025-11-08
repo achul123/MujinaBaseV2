@@ -2,11 +2,10 @@
 
 An injectable java cheat base for minecraft with a cool event system, loaded with C++, that can remap to work on vanilla, forge and lunar client
 
-The base is for 1.7.10 minecraft, however it should be adaptable to any minecraft version. \
-It works only on windows at the moment, however it could be modified to work on linux fairly easily \
-(replace building scripts, and add jvm.so).
+The base is for 1.7.10 minecraft. \
+and works only on windows.
 
-THIS IS NOT A WAY TO INJECT FORGE / FABRIC MODS, it only allows you to build an injectable jar that can access minecraft classes, as well as slightly modify existing minecraft methods' implementations using events.\
+This is not a way to inject Forge / Fabric mods, it only allows you to build an injectable jar that can access minecraft classes, as well as slightly modify existing minecraft methods' implementations using events.\
 Which means to actually make use of that base, you need to understand the minecraft source code, and know exactly which part of it you wish to modify, and what you wanna add to it.
 # Building
 
@@ -105,11 +104,28 @@ value's Class can be one of : String, Integer, Float, Double, Long, MethodType, 
 
 # Known issues
 - The classes aren't unloaded properly
-- On reinject, some modifications made to the jar might not be taken into account, because it will use the previous classes that haven't been unloaded properly. (This is likely due to the retransformed classes keeping resolved event handler method in cache, which prevent them from beeing unloaded, possible fix : use reflection, so that resolved methods aren't cached, problem : bad performance because it will have to lookup for the methods using symbolic names every time)
+- On reinject, some modifications made to the jar might not be taken into account, because it will use the previous classes that haven't been unloaded properly. 
 - It leaves a lot of traces (not fixable)
 - The classloader trick I use for the modified method to be able to call event handlers might not work on all clients, for example on lunar, the classLoader does not necessarily forward the loadClass to its parent first, except for some internal jdk classes, which breaks the trick. (using reflection will also fix that, at the cost of performance, since the classloader trick won't be needed anymore) \
 Edit : injection  on lunar has been fixed, by excluding the event handler classes from lunar classloader (the lunar classloader holds a Set with excluded class names)
+- The classloader trick seems to only work on java 8
 - Since java 9, modules were introduced, it could cause some issues, for example I know a module has to list the modules it will use reflection on.
+- The named minecraft jar, used as a library to allow InjectableJar to refer to minecraft code, was remapped from the official obfuscated minecraft jar, and thus is missing some information, not required to run the game, but required to debug or to develop additionnal content for the game.\ 
+For example it's missing the inner classes attributes (see: [Java Virtual Machine Specification 4.7.6](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.7.6)),\
+which is for example used by the IDE to map the inner class `net/minecraft/network/play/client/C02PacketUseEntity$Action`, to its actual name you would use in your code : `net.minecraft.network.play.client.C02PacketUseEntity.Action`.\
+Without that information the IDE will treat the code as an error, thinking `net.minecraft.network.play.client.C02PacketUseEntity.Action` does not exist, since it will treat `C02PacketUseEntity` as a package, not as an outer class, and treat `net.minecraft.network.play.client.C02PacketUseEntity$Action` as a seperate, unrelated class.\
+To fix that you can write your code using `C02PacketUseEntity$Action` instead of `C02PacketUseEntity.Action` and ignore the error from the IDE, or you also can add the inner class attribute to the named minecraft jar manually, using ASM or [Recaf](https://github.com/Col-E/Recaf). For example to fix the `C02PacketUseEntity` and `C02PacketUseEntity$Action` inner class attributes you would: 
+- open `InjectableJar\InjectableJar\local_maven_repo\minecraft\client\named\1.7.10\named-1.7.10.jar` using recaf
+- edit the `net/minecraft/network/play/client/C02PacketUseEntity` and `net/minecraft/network/play/client/C02PacketUseEntity$Action` classes with the `Edit class in assembler` feature of Recaf and add the following code:
+```
+.inner public final enum {
+    name: Action,
+    inner: net/minecraft/network/play/client/C02PacketUseEntity$Action,
+    outer: net/minecraft/network/play/client/C02PacketUseEntity
+}
+```
+(`public final enum` are the access flags of the inner class `C02PacketUseEntity$Action`)
+
 
 # Working Principle
 ## Building process detailed
@@ -234,28 +250,11 @@ just like it's done for the asm dependency : [MemoryJarClassLoader.java](Injecta
 Once you made your changes, you will have to compile it, and write its bytes to [src/MemoryJarClassLoader.class.hpp](src/MemoryJarClassLoader.class.hpp)
 
 ## How do I inject ?
-Idk
+Should be like any other dll
+You can use [systeminformer](https://systeminformer.sourceforge.io/) for example
 
 ## Mujina ?
 This project is very similar to the previous one [Mujina-Public](https://github.com/Lefraudeur/Mujina-Public) \
 Except this time, it focuses on the base, rather than the possible cheat modules you could do using it. \
 There are also a lot of improvement on the jar loading method, it is now less likely to fail, and should be faster.\
 It is also now way easier to make new events, and they don't use reflection anymore, so it should be more performant.
-
-# Disclaimer
-There is no guarrantee that this base can actually be used to build a functional cheat (it was not tested), or to fit any other particular purpose \
-It is purely something to play with. \
-I encourage you to use this base as a resource to build your own, that will fit your needs. I use a lot of FabricMC tools, because they are easy to use, but you can also use the ones proposed by Forge, or you can make your own tools.
-
-You can contact me on discord, but If I don't answer you then don't insist. There is a good chance I've seen your message, but I didn't want to answer you. (I have no obligation to do so)
-
-Don't expect me to update / maintain this project.
-Don't cheat
-
-Although the term "Injectable" is often associated with modifying minecraft in a more stealthy way, it is not the case at all for this base.\
-This base isn't built to bypass any anticheats or detections of any sort.\
-The project makes use of some jvmti features that might not be available on all jvms.
-
-You are free to do anything you want using this project, except obviously :
-- Redistributing while claiming ownership of the project
-- Pretending to be me (happens a lot so be careful, I communicate only through discord: lefraudeur, which is linked to my github account)
