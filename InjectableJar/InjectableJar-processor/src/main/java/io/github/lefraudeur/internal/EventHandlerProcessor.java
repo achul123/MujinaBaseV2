@@ -11,6 +11,7 @@ import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import java.io.IOException;
@@ -226,7 +227,9 @@ public class EventHandlerProcessor extends AbstractProcessor
         switch (type.getKind())
         {
             case DECLARED:
-                return "L" + removeTypeParameter(type.toString()).replace('.', '/') + ";";
+                DeclaredType declaredType = (DeclaredType)type;
+                Name binaryName = elements.getBinaryName((TypeElement)declaredType.asElement());
+                return "L" + removeTypeParameter(binaryName.toString()).replace('.', '/') + ";";
             case VOID:
                 return "V";
             case BOOLEAN:

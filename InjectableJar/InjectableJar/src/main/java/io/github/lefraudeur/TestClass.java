@@ -5,7 +5,6 @@ import io.github.lefraudeur.internal.EventHandler;
 import io.github.lefraudeur.internal.Thrower;
 import net.minecraft.block.Block;
 import net.minecraft.client.entity.EntityClientPlayerMP;
-import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.world.IBlockAccess;
 
 import static io.github.lefraudeur.internal.patcher.MethodModifier.Type.*;
@@ -63,4 +62,6 @@ public class TestClass
             return 4.0D;
         return value;
     }
+
+
 }
