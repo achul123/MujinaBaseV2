@@ -83,7 +83,7 @@ public class ReturnThrowMethodModifier extends MethodModifier
                 {
                     popReturnValueBasedOnReturnType(mv);
                     mv.visitVarInsn(Opcodes.ALOAD, throwerVarIndex);
-                    mv.visitFieldInsn(Opcodes.GETFIELD, ThrowerClassName, "thrown", "");
+                    mv.visitFieldInsn(Opcodes.GETFIELD, ThrowerClassName, "thrown", "Ljava/lang/Throwable;");
                 }
             }
         };

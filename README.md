@@ -14,7 +14,11 @@ However the maven project relies on multiple online repositories, which could br
 The compiled dll will be saved in `build/JarLoader.dll`
 
 By default the dll should print "hello from Mujina" in chat on inject and "bye from Mujina" on uninject. \
-It also has some example premade events, like one that makes shouldSideBerendered return false. \
+It also has some code to showcase how you can use the event system: 
+- xray, (enable it by pressing x, you may also need to disable smooth lighting and fog to see the blocks properly). \
+- 4 blocks reach enabled by default
+- the client brand name sent to the server on login has "Mujina Boosted" appended
+And maybe some other test code I forgot to mention here
 See : [TestClass.java](InjectableJar/InjectableJar/src/main/java/io/github/lefraudeur/TestClass.java)
 
 Since you don't build using your IDE, make sure you save all the files you edited with your IDE first.
@@ -104,28 +108,42 @@ value's Class can be one of : String, Integer, Float, Double, Long, MethodType, 
 
 # Known issues
 - The classes aren't unloaded properly
+
 - On reinject, some modifications made to the jar might not be taken into account, because it will use the previous classes that haven't been unloaded properly. 
+
 - It leaves a lot of traces (not fixable)
+
 - The classloader trick I use for the modified method to be able to call event handlers might not work on all clients, for example on lunar, the classLoader does not necessarily forward the loadClass to its parent first, except for some internal jdk classes, which breaks the trick. (using reflection will also fix that, at the cost of performance, since the classloader trick won't be needed anymore) \
 Edit : injection  on lunar has been fixed, by excluding the event handler classes from lunar classloader (the lunar classloader holds a Set with excluded class names)
+
 - The classloader trick seems to only work on java 8
+
 - Since java 9, modules were introduced, it could cause some issues, for example I know a module has to list the modules it will use reflection on.
-- The named minecraft jar, used as a library to allow InjectableJar to refer to minecraft code, was remapped from the official obfuscated minecraft jar, and thus is missing some information, not required to run the game, but required to debug or to develop additionnal content for the game.\ 
+
+- The named minecraft jar, used as a library to allow InjectableJar to refer to minecraft code, was remapped from the official obfuscated minecraft jar, and thus is missing some information, not required to run the game, but required to debug or to develop additionnal content for the game.\
 For example it's missing the inner classes attributes (see: [Java Virtual Machine Specification 4.7.6](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.7.6)),\
 which is for example used by the IDE to map the inner class `net/minecraft/network/play/client/C02PacketUseEntity$Action`, to its actual name you would use in your code : `net.minecraft.network.play.client.C02PacketUseEntity.Action`.\
 Without that information the IDE will treat the code as an error, thinking `net.minecraft.network.play.client.C02PacketUseEntity.Action` does not exist, since it will treat `C02PacketUseEntity` as a package, not as an outer class, and treat `net.minecraft.network.play.client.C02PacketUseEntity$Action` as a seperate, unrelated class.\
 To fix that you can write your code using `C02PacketUseEntity$Action` instead of `C02PacketUseEntity.Action` and ignore the error from the IDE, or you also can add the inner class attribute to the named minecraft jar manually, using ASM or [Recaf](https://github.com/Col-E/Recaf). For example to fix the `C02PacketUseEntity` and `C02PacketUseEntity$Action` inner class attributes you would: 
-- open `InjectableJar\InjectableJar\local_maven_repo\minecraft\client\named\1.7.10\named-1.7.10.jar` using recaf
-- edit the `net/minecraft/network/play/client/C02PacketUseEntity` and `net/minecraft/network/play/client/C02PacketUseEntity$Action` classes with the `Edit class in assembler` feature of Recaf and add the following code:
-```
-.inner public final enum {
-    name: Action,
-    inner: net/minecraft/network/play/client/C02PacketUseEntity$Action,
-    outer: net/minecraft/network/play/client/C02PacketUseEntity
-}
-```
-(`public final enum` are the access flags of the inner class `C02PacketUseEntity$Action`)
+    - open `InjectableJar\InjectableJar\local_maven_repo\minecraft\client\named\1.7.10\named-1.7.10.jar` using recaf
+    - edit the `net/minecraft/network/play/client/C02PacketUseEntity` and `net/minecraft/network/play/client/C02PacketUseEntity$Action` classes with the `Edit class in assembler` feature of Recaf and add the following code:
+    ```
+    .inner public final enum {
+        name: Action,
+        inner: net/minecraft/network/play/client/C02PacketUseEntity$Action,
+        outer: net/minecraft/network/play/client/C02PacketUseEntity
+    }
+    ```
+    (`public final enum` are the access flags of the inner class `C02PacketUseEntity$Action`)
 
+- Sometimes, when modifying a class with events, you might crash with the exception "ClassNotFoundException io.github.lefraudeur.*" or something similar, this is likely because the class you modified is defined in a different classLoader and can't access the io.github.lefraudeur classes that are defined in the "memoryJarClassLoader".\
+To fix that you can do the classLoader trick I used on Minecraft's classLoader and on the classLoader of `org.lwjgl.input.Keyboard`, as a similar issue was present with these classes.
+It's in : [main.cpp](src/main.cpp)
+The main idea is to add an instance of EventClassLoader in the parent-child classLoader chain :
+    - before : parentClassLoader -> classLoader
+    - after : parentClassLoader -> eventClassLoader -> classLoader
+The eventClassLoader will forward the loadClass call to parentClassLoader as what would normally happen, but this time if the class is not found in the parent, it will also try to load the class using memoryJarClassLoader.\
+Note that this only works if the classLoader follows a classic classLoader delegation model.
 
 # Working Principle
 ## Building process detailed

@@ -86,13 +86,20 @@ static void mainFrame(const jvmti& jvmti_instance)
     jni::jclass_cache<maps::EventClassLoader>::value = classLoader.loadClass(maps::String::create(jni::to_dot<maps::EventClassLoader::get_name()>()));
     if (!jni::jclass_cache<maps::EventClassLoader>::value)
         return logger::error("failed to find io.github.lefraudeur.internal.EventClassLoader");
-    maps::EventClassLoader eventClassLoader = maps::EventClassLoader::new_object(&maps::EventClassLoader::constructor, minecraft_classloader.parent.get(), classLoader);
 
+    maps::EventClassLoader eventClassLoader = maps::EventClassLoader::new_object(&maps::EventClassLoader::constructor, minecraft_classloader.parent.get(), classLoader);
     minecraft_classloader.parent = (maps::ClassLoader)eventClassLoader;
+
+    // setup classLoader trick for the classLoader that defined org.lwjgl.input.Keyboard
+    maps::ClassLoader lwjgl_classLoader = jvmti_instance.get_class_ClassLoader(minecraft_classloader.loadClass(maps::String::create("org.lwjgl.input.Keyboard")));
+    maps::EventClassLoader eventClassLoader2 = maps::EventClassLoader::new_object(&maps::EventClassLoader::constructor, lwjgl_classLoader.parent.get(), classLoader);
+    lwjgl_classLoader.parent = (maps::ClassLoader)eventClassLoader2;
 
     if (!transformer::init(jvmti_instance, classLoader))
     {
+        // remove classLoader trick
         minecraft_classloader.parent = eventClassLoader.parent.get();
+        lwjgl_classLoader.parent = eventClassLoader2.parent.get();
         return;
     }
 
@@ -110,7 +117,10 @@ static void mainFrame(const jvmti& jvmti_instance)
 
     transformer::shutdown(jvmti_instance);
 
+    // remove classLoader trick
     minecraft_classloader.parent = eventClassLoader.parent.get();
+    lwjgl_classLoader.parent = eventClassLoader2.parent.get();
+
 }
 
 static void app()
