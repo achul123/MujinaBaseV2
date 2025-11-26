@@ -19,6 +19,48 @@
 # define MINECRAFT_CLASS "net/minecraft/client/Minecraft"
 #endif
 
+class c_classloader_trick
+{
+private:
+    struct tricked_t;
+
+public:
+    c_classloader_trick(std::initializer_list<maps::ClassLoader> classLoaders, maps::MemoryJarClassLoader memoryJarClassLoader) :
+        tricked_loaders_size(classLoaders.size()),
+        tricked_loaders(std::make_unique<tricked_t[]>(classLoaders.size()))
+    {
+        for (int i = 0; i < classLoaders.size(); ++i)
+        {
+            maps::ClassLoader classLoader = *(classLoaders.begin() + i);
+            maps::ClassLoader parent = classLoader.parent.get();
+            if (parent && parent.is_instance_of<maps::EventClassLoader>()) continue;
+
+            maps::EventClassLoader eventClassLoader = maps::EventClassLoader::new_object(&maps::EventClassLoader::constructor, parent, memoryJarClassLoader);
+            classLoader.parent = (maps::ClassLoader)eventClassLoader;
+
+            tricked_loaders[i] = { classLoader, (maps::ClassLoader)eventClassLoader };
+        }
+    }
+
+    ~c_classloader_trick()
+    {
+        for (int i = 0; i < tricked_loaders_size; ++i)
+        {
+            tricked_t& tricked_loader = tricked_loaders[i];
+            tricked_loader.tricked.parent = tricked_loader.eventClassLoader.parent.get();
+        }
+    }
+
+private:
+    struct tricked_t
+    {
+        maps::ClassLoader tricked;
+        maps::ClassLoader eventClassLoader;
+    };
+    size_t tricked_loaders_size;
+    std::unique_ptr<tricked_t[]> tricked_loaders;
+};
+
 
 #ifdef __linux__
 static Display* display = nullptr;
@@ -65,7 +107,6 @@ static void mainFrame(const jvmti& jvmti_instance)
     jni::jclass_cache<maps::MemoryJarClassLoader>::value = MemoryJarClassLoaderClass;
 
 
-
     // here we create the MemoryJarClassLoader that will define InjectableJar, you can replace this by a classic URLClassLoader to load from a file instead.
     // warning: MemoryJarClassLoader also changes the delegation model for the asm library, so you might have issues doing that 
     // (you could code a new ClassLoader that extends URLClassLoader to fix it)
@@ -82,26 +123,17 @@ static void mainFrame(const jvmti& jvmti_instance)
         return logger::error("failed to find io.github.lefraudeur.Main");
     logger::log("loaded main class");
 
-    // Setup the classLoader trick so that minecraft classes can access the cheat classes
+
     jni::jclass_cache<maps::EventClassLoader>::value = classLoader.loadClass(maps::String::create(jni::to_dot<maps::EventClassLoader::get_name()>()));
     if (!jni::jclass_cache<maps::EventClassLoader>::value)
         return logger::error("failed to find io.github.lefraudeur.internal.EventClassLoader");
 
-    maps::EventClassLoader eventClassLoader = maps::EventClassLoader::new_object(&maps::EventClassLoader::constructor, minecraft_classloader.parent.get(), classLoader);
-    minecraft_classloader.parent = (maps::ClassLoader)eventClassLoader;
-
-    // setup classLoader trick for the classLoader that defined org.lwjgl.input.Keyboard
+    // Setup the classLoader trick so that minecraft classes can access the cheat classes, do it for org.lwjgl.input.Keyboard as well
     maps::ClassLoader lwjgl_classLoader = jvmti_instance.get_class_ClassLoader(minecraft_classloader.loadClass(maps::String::create("org.lwjgl.input.Keyboard")));
-    maps::EventClassLoader eventClassLoader2 = maps::EventClassLoader::new_object(&maps::EventClassLoader::constructor, lwjgl_classLoader.parent.get(), classLoader);
-    lwjgl_classLoader.parent = (maps::ClassLoader)eventClassLoader2;
+    c_classloader_trick classloader_trick( {minecraft_classloader, lwjgl_classLoader}, classLoader );
 
     if (!transformer::init(jvmti_instance, classLoader))
-    {
-        // remove classLoader trick
-        minecraft_classloader.parent = eventClassLoader.parent.get();
-        lwjgl_classLoader.parent = eventClassLoader2.parent.get();
         return;
-    }
 
 
     // we now call the onLoad method which should send hello in chat
@@ -116,10 +148,6 @@ static void mainFrame(const jvmti& jvmti_instance)
     Main.onUnload();
 
     transformer::shutdown(jvmti_instance);
-
-    // remove classLoader trick
-    minecraft_classloader.parent = eventClassLoader.parent.get();
-    lwjgl_classLoader.parent = eventClassLoader2.parent.get();
 
 }
 
