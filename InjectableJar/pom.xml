@@ -21,22 +21,18 @@
       <id>local_maven_repo</id>
       <url>file://${project.basedir}/InjectableJar/local_maven_repo</url>
     </repository>
-    <repository>
-      <id>asm</id>
-      <url>https://repository.ow2.org/nexus/content/repositories/snapshots</url>
-    </repository>
   </repositories>
 
   <dependencies>
     <dependency>
       <groupId>org.ow2.asm</groupId>
       <artifactId>asm</artifactId>
-      <version>9.9-SNAPSHOT</version>
+      <version>9.9</version>
     </dependency>
     <dependency>
       <groupId>org.ow2.asm</groupId>
       <artifactId>asm-commons</artifactId>
-      <version>9.9-SNAPSHOT</version>
+      <version>9.9</version>
     </dependency>
     <dependency>
       <groupId>minecraft.client</groupId>
