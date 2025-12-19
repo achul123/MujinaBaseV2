@@ -28,6 +28,7 @@ public class TestClass
     public static void sendChatMessage(Canceler canceler, EntityPlayerSP player, String message)
     {
         System.out.println("sendChatMessage on entry succeeded");
+        System.out.println(Main.getWindowTitle());
     }
 
     @EventHandler(type=ON_RETURN_THROW,
