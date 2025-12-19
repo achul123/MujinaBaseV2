@@ -1,6 +1,7 @@
 package io.github.lefraudeur;
 
 import static io.github.lefraudeur.internal.patcher.MethodModifier.Type.ON_ENTRY;
+import static io.github.lefraudeur.internal.patcher.MethodModifier.Type.ON_LDC_CONSTANT;
 import static io.github.lefraudeur.internal.patcher.MethodModifier.Type.ON_RETURN_THROW;
 
 import org.lwjgl.input.Keyboard;
@@ -55,8 +56,21 @@ public class TestClass
         return false;
     }
 
+    @EventHandler(type=ON_LDC_CONSTANT,
+            targetClass = "net/minecraft/client/renderer/EntityRenderer",
+            targetMethodName = "getMouseOver",
+            targetMethodDescriptor = "(F)V")
+    public static Object getMouseOverVar4(Object value)
+    {
+        // reach
+        // it changes \u26033 value to 4.0D
+        if (value instanceof Double && (Double)value == 3.0D)
+            return 4.0D;
+        return value;
+    }
 
-        @EventHandler(type=ON_RETURN_THROW,
+
+    @EventHandler(type=ON_RETURN_THROW,
             targetClass = "org/lwjgl/input/Keyboard",
             targetMethodName = "next",
             targetMethodDescriptor = "()Z",
